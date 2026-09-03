@@ -7,10 +7,13 @@ metadata:
     {{- include "microservice.labels" . | nindent 4 }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
-  # tls 블록에 secretName을 지정하지 않는다.
-  # Traefik 기본 TLSStore(platform/ingress/tlsstore.yaml)가
-  # 모든 네임스페이스에 와일드카드 인증서를 제공한다.
-  # 네임스페이스마다 Secret을 복사하면 새 네임스페이스가 생길 때 조용히 깨진다.
+  # tls 블록에 secretName을 지정하지 않는다 — 네임스페이스마다 Secret을 복사하면
+  # 새 네임스페이스가 생길 때 조용히 깨지므로, Traefik의 기본(TLSStore) 인증서에 기댄다.
+  #
+  # 주의: 그 TLSStore 는 아직 이 저장소에 없다 (platform/ 아래는 data/·namespaces/ 뿐).
+  # 지금 이 블록은 Traefik이 자체 발급한 self-signed 기본 인증서로 떨어진다 — 브라우저가
+  # 경고를 낸다. 도메인이 정해지면 TLSStore(와일드카드 인증서) 또는 cert-manager 중
+  # 하나로 실제 인증서를 붙여야 한다 (README "아직 안 된 것" 참고).
   tls:
     - hosts:
         - {{ .Values.ingress.host | quote }}

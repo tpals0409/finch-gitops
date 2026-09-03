@@ -59,6 +59,13 @@ backend 만 클러스터 내부에서 호출합니다.
    관측 스택이 CRD 까지 들여온 뒤에 다시 켤 것.
 6. **NetworkPolicy** — 차트가 `networking.finch.io/ingress`, `/metrics` 라벨을
    자동으로 붙입니다. 그 라벨을 받는 정책을 아직 안 썼습니다.
+7. **TLS 종료** — `charts/microservice/templates/ingress.yaml` 이 `secretName` 없는
+   `tls:` 블록을 렌더합니다. 지금은 Traefik의 self-signed 기본 인증서로 떨어질 뿐,
+   실제 인증서로 끊는 설정은 없습니다. 도메인이 정해지면 둘 중 하나를 만듭니다 —
+   Traefik TLSStore(와일드카드 인증서를 모든 네임스페이스에 제공, Secret 복사 불필요)
+   또는 cert-manager(Let's Encrypt 자동 발급). `infra/nginx/nginx.conf` 가 443 을
+   지운 근거("k8s 에서는 Ingress 가 TLS 를 끊는다")의 반대편이 아직 비어 있다는 뜻이니,
+   이 항목을 채우기 전까지는 그 전제가 완전히 성립하지 않습니다.
 
 ## 애플리케이션 저장소에서 같이 고쳐야 하는 것
 
