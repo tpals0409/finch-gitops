@@ -55,8 +55,12 @@ probes:
     periodSeconds: 10
     failureThreshold: 3
 
+# 기본 비활성. Prometheus Operator 가 이 클러스터에 아직 없어 CRD(ServiceMonitor)가 없다.
+# true 로 두면 ArgoCD 가 "no matches for kind ServiceMonitor" 로 Application 전체를
+# Degraded 로 세우고 Deployment 조차 만들지 않는다 (첫 동기화에서 실측). 관측 스택
+# (finch-gitops README "아직 안 된 것" 5번)이 CRD 까지 들여온 뒤에 켤 것.
 metrics:
-  enabled: true
+  enabled: false
   path: /actuator/prometheus
   interval: 60s
   scrapeTimeout: 10s

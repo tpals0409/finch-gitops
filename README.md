@@ -52,6 +52,11 @@ backend 만 클러스터 내부에서 호출합니다.
 3. **호스트 이름** — values 의 `CHANGEME.example.com` 자리. 도메인이 정해지면 채웁니다.
 4. **이미지 태그** — values 의 `CHANGEME`. 첫 이미지를 빌드한 뒤 채웁니다.
 5. **관측 스택** — Prometheus, Loki, Grafana. compose 쪽 구성이 이미 있으니 옮겨옵니다.
+   **이게 없으면 backend 배포가 막힙니다** — Prometheus Operator(ServiceMonitor CRD)가 없는
+   채로 `apps/prod/backend/values.yaml` 의 `metrics.enabled` 를 켜면 ArgoCD 가
+   `no matches for kind "ServiceMonitor"` 로 Application 전체를 Degraded 로 세우고
+   Deployment 도 만들지 않습니다 (첫 동기화에서 실측). 그래서 지금은 꺼 둔 상태입니다.
+   관측 스택이 CRD 까지 들여온 뒤에 다시 켤 것.
 6. **NetworkPolicy** — 차트가 `networking.finch.io/ingress`, `/metrics` 라벨을
    자동으로 붙입니다. 그 라벨을 받는 정책을 아직 안 썼습니다.
 
