@@ -1,0 +1,86 @@
+# ai — FastAPI. compose 의 ai 서비스를 옮긴 것.
+# 외부로 열지 않는다. backend 가 클러스터 내부에서만 호출한다.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/tpals0409/finch-ai
+  tag: CHANGEME
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-pull
+
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+terminationGracePeriodSeconds: 30
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+# ai 는 ingress 를 두지 않는다. compose 의 nginx 도 ai 로 가는 경로가 없었고,
+# backend 만 http://ai:8000 으로 호출한다. 외부 노출은 공격면만 늘린다.
+ingress:
+  enabled: false
+
+# 앱이 여는 것은 /health 하나뿐이다 (ai/app/api/main.py).
+# liveness 와 readiness 를 나눌 근거가 없으므로 같은 경로를 쓴다.
+probes:
+  enabled: true
+  startup:
+    path: /health
+    failureThreshold: 30
+    periodSeconds: 5
+  liveness:
+    path: /health
+    periodSeconds: 20
+    failureThreshold: 3
+  readiness:
+    path: /health
+    periodSeconds: 10
+    failureThreshold: 3
+
+# 아직 Prometheus 엔드포인트를 확인하지 못했다. 노출 경로가 정해지면 켠다.
+metrics:
+  enabled: false
+
+# DATABASE_URL 과 외부 API 키(GMS, NAVER 등)가 여기 들어온다.
+# compose 에서 infra/ai.env 로 주입하던 값들이다 — ai/.env.example 참고.
+envFrom:
+  - secretRef:
+      name: ai-secrets
+
+env:
+  - name: TZ
+    value: Asia/Seoul
+  # compose 가 environment 로 env_file 을 덮어썼던 것과 같은 의도.
+  # APP_ENV 기본값이 local 이고, local 에서는 내부 토큰 검증이 통째로 꺼진다
+  # (ai/app/api/deps.py). 여기서 명시해 인증을 fail-closed 로 닫는다.
+  - name: APP_ENV
+    value: prod
+  - name: BACKEND_BASE_URL
+    value: http://backend:80
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 200m
+  limits:
+    memory: 1Gi
+    cpu: 1000m
+
+autoscaling:
+  enabled: false
+
+persistence:
+  enabled: false
+
+serviceAccount:
+  create: true
+  name: ""

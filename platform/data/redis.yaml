@@ -1,0 +1,60 @@
+# redis — backend 의 세션·캐시용. compose 에도 볼륨이 없었으므로 상태를 보존하지 않는다.
+# 재시작하면 캐시는 비워진다. 그걸 견디지 못하는 데이터를 넣지 말 것.
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: finch-prod
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: finch-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        app.kubernetes.io/part-of: finch
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          # 메모리 상한에 닿으면 오래된 키부터 버린다. 상한 없이 두면
+          # 컨테이너 limit 을 넘겨 OOMKill 로 통째로 죽는다.
+          args:
+            - redis-server
+            - --maxmemory
+            - 200mb
+            - --maxmemory-policy
+            - allkeys-lru
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 20m
+            limits:
+              memory: 256Mi
+              cpu: 500m

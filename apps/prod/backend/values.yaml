@@ -1,0 +1,101 @@
+# backend — Spring Boot. compose 의 backend 서비스를 옮긴 것.
+# 환경변수 계약은 backend/src/main/resources/application.yaml 이 정의한다.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/tpals0409/finch-backend
+  # CI 가 이미지를 올린 뒤 자동으로 갱신한다. 첫 배포 전에는 수동으로 채운다.
+  tag: CHANGEME
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-pull
+
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Spring 종료는 느리다. 종료 유예를 넉넉히 주고 preStop 으로
+# 로드밸런서가 엔드포인트를 뺄 시간을 번다.
+terminationGracePeriodSeconds: 40
+lifecycle:
+  preStop:
+    exec:
+      command: ["sh", "-c", "sleep 5"]
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: traefik
+  host: CHANGEME.example.com
+  path: /api
+  pathType: Prefix
+
+# application.yaml 이 management.endpoint.health.probes.enabled 를 켜 두었다.
+# liveness 와 readiness 가 분리돼 있으므로 각각 쓴다.
+probes:
+  enabled: true
+  startup:
+    path: /actuator/health/liveness
+    failureThreshold: 30
+    periodSeconds: 5
+  liveness:
+    path: /actuator/health/liveness
+    periodSeconds: 20
+    failureThreshold: 3
+  readiness:
+    path: /actuator/health/readiness
+    periodSeconds: 10
+    failureThreshold: 3
+
+metrics:
+  enabled: true
+  path: /actuator/prometheus
+  interval: 60s
+  scrapeTimeout: 10s
+
+# JWT_SECRET, KAKAO_CLIENT_ID, KAKAO_CLIENT_SECRET, DB 비밀번호가 여기 들어온다.
+# SealedSecret 으로 만들어 platform/ 에 커밋한다 — 클러스터의 봉인 키가 필요하다.
+envFrom:
+  - secretRef:
+      name: backend-secrets
+
+env:
+  - name: TZ
+    value: Asia/Seoul
+  # compose 는 mem_limit 1536m 이었다. JVM 이 컨테이너 상한을 넘지 않게 비율로 묶는다.
+  - name: JAVA_TOOL_OPTIONS
+    value: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"
+  - name: POSTGRES_HOST
+    value: postgres-backend
+  - name: POSTGRES_PORT
+    value: "5432"
+  - name: REDIS_HOST
+    value: redis
+  - name: REDIS_PORT
+    value: "6379"
+
+resources:
+  requests:
+    memory: 768Mi
+    cpu: 200m
+  limits:
+    memory: 1536Mi
+    cpu: 1000m
+
+autoscaling:
+  enabled: false
+
+persistence:
+  enabled: false
+
+serviceAccount:
+  create: true
+  name: ""

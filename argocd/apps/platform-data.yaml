@@ -1,0 +1,22 @@
+# 상태를 가진 것들: postgres 2대와 redis.
+# 서비스(wave 1)보다 먼저 떠야 하므로 wave "0".
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-data
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: finch
+  source:
+    repoURL: https://github.com/tpals0409/finch-gitops.git
+    targetRevision: main
+    path: platform/data
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: finch-prod
+  syncPolicy:
+    automated:
+      prune: false   # PVC 를 실수로 지우면 DB 가 날아간다.
+      selfHeal: true

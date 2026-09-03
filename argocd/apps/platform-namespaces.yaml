@@ -1,0 +1,22 @@
+# 네임스페이스는 다른 무엇보다 먼저 만들어져야 한다.
+# sync-wave "0" 으로 서비스(wave 1)보다 앞선다.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-namespaces
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: finch
+  source:
+    repoURL: https://github.com/tpals0409/finch-gitops.git
+    targetRevision: main
+    path: platform/namespaces
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false   # 네임스페이스 삭제는 데이터 유실이다. 수동으로만 지운다.
+      selfHeal: true

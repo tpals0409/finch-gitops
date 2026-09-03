@@ -1,0 +1,31 @@
+# 루트 Application (app-of-apps 패턴)
+#
+# 이것만 수동으로 apply 하면 나머지는 전부 git 에서 자동으로 따라온다.
+# argocd/apps/ 와 argocd/applicationsets/ 아래 매니페스트를 모두 관리한다.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: finch
+  source:
+    repoURL: https://github.com/tpals0409/finch-gitops.git
+    targetRevision: main
+    path: argocd
+    directory:
+      recurse: true
+      # 자기 자신과 AppProject 는 제외한다.
+      # 포함하면 ArgoCD 가 자기 자신을 관리하려다 혼란스러운 상태가 된다.
+      exclude: "{root/*,projects/*}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

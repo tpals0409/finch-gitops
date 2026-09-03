@@ -1,0 +1,77 @@
+# frontend — 빌드된 정적 파일을 nginx 가 서빙한다.
+#
+# compose 와 달라지는 점: 여기서는 /api 프록시를 하지 않는다.
+# Ingress 가 /api 를 backend 로 직접 보내므로 nginx 는 정적 파일만 담당한다.
+# 이미지 안의 infra/nginx/nginx.conf 에서 proxy_pass 블록을 걷어내야 한다.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/tpals0409/finch-frontend
+  tag: CHANGEME
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-pull
+
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+terminationGracePeriodSeconds: 30
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+# 나머지 전부를 받는다. backend 의 /api 가 더 긴 prefix 라 먼저 매칭된다.
+ingress:
+  enabled: true
+  className: traefik
+  host: CHANGEME.example.com
+  path: /
+  pathType: Prefix
+
+# 정적 서버라 헬스 경로가 따로 없다. 루트가 200 이면 살아 있는 것이다.
+probes:
+  enabled: true
+  startup:
+    path: /
+    failureThreshold: 12
+    periodSeconds: 5
+  liveness:
+    path: /
+    periodSeconds: 20
+    failureThreshold: 3
+  readiness:
+    path: /
+    periodSeconds: 10
+    failureThreshold: 3
+
+metrics:
+  enabled: false
+
+env:
+  - name: TZ
+    value: Asia/Seoul
+
+resources:
+  requests:
+    memory: 32Mi
+    cpu: 10m
+  limits:
+    memory: 128Mi
+    cpu: 200m
+
+autoscaling:
+  enabled: false
+
+persistence:
+  enabled: false
+
+serviceAccount:
+  create: true
+  name: ""
