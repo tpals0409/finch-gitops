@@ -25,7 +25,9 @@ terminationGracePeriodSeconds: 30
 service:
   type: ClusterIP
   port: 80
-  targetPort: 80
+  # 컨테이너는 nginxinc/nginx-unprivileged 로 뜬다 — 기본 securityContext(runAsUser 1000)로는
+  # 1024 미만 포트를 못 열어 8080 을 듣는다 (infra/nginx/nginx.conf).
+  targetPort: 8080
 
 # 나머지 전부를 받는다. backend 의 /api 가 더 긴 prefix 라 먼저 매칭된다.
 ingress:
