@@ -51,6 +51,8 @@ ingress:
   enabled: true
   className: traefik
   host: CHANGEME.example.com
+  # 이 네임스페이스에 있는 TLS Secret 이름. 비우면 Traefik self-signed 로 떨어진다.
+  tlsSecretName: ""
   # 경로 기반 라우팅. 와일드카드 인증서(*.p.ssafy.io)가 한 레벨만 매칭하므로
   # 단일 호스트에 경로로 라우팅한다. 서브도메인이 필요하면 값을 나눈다.
   #

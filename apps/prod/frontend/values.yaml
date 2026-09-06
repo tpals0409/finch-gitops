@@ -33,7 +33,10 @@ service:
 ingress:
   enabled: true
   className: traefik
-  host: CHANGEME.example.com
+  host: app.finchapp.org
+  # Cloudflare Origin Certificate. *.finchapp.org 와일드카드라 www·admin 을
+  # 붙일 때 재발급이 필요 없다. 봉인본은 platform/data/sealed-origin-tls.yaml
+  tlsSecretName: finch-origin-tls
   path: /
   pathType: Prefix
 

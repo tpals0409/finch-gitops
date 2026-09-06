@@ -1,3 +1,19 @@
+# 첫 배포에서 AI 를 뺀다. 차트가 이 스위치 하나로 모든 리소스 렌더를 건너뛴다.
+#
+# ApplicationSet 이 apps/prod/* 를 훑어 Application 을 자동 생성하므로 디렉터리를 두면
+# 배포 대상이 된다. 그런데 ai-secrets 가 아직 없어 지금 올리면 CrashLoopBackOff 에 빠진다.
+# Secret 을 미리 만들지 않는 이유는 AI 의 내부 토큰 계약이 아직 없어서다 — 백엔드에 AI 중계가
+# 없어(domain/ai 에 예외 클래스 하나뿐) 지금 만든 토큰은 아무도 안 쓰고, 중계가 붙을 때
+# 다시 봉인해야 한다.
+#
+# 첫 배포의 목적은 KIS 가 이 서버에서 실제로 뚫리는지 확인하는 것이고 거기에 AI 는 필요 없다.
+# 부품이 적을수록 첫 동기화가 왜 실패했는지 알아내기 쉽다. AI 는 임베딩 10,198청크 복원이라는
+# 별개 숙제도 달고 있다 (ai/docs/seed-dataset.md).
+#
+# 켤 때 할 일: ai-secrets 봉인(DATABASE_URL 을 postgres-ai 주소로 다시 쓸 것) → 이 값을 true.
+application:
+  enabled: false
+
 # ai — FastAPI. compose 의 ai 서비스를 옮긴 것.
 # 외부로 열지 않는다. backend 가 클러스터 내부에서만 호출한다.
 replicaCount: 1

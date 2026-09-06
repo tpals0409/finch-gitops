@@ -34,7 +34,10 @@ service:
 ingress:
   enabled: true
   className: traefik
-  host: CHANGEME.example.com
+  host: app.finchapp.org
+  # Cloudflare Origin Certificate. *.finchapp.org 와일드카드라 www·admin 을
+  # 붙일 때 재발급이 필요 없다. 봉인본은 platform/data/sealed-origin-tls.yaml
+  tlsSecretName: finch-origin-tls
   path: /api
   pathType: Prefix
 
@@ -55,12 +58,16 @@ probes:
     periodSeconds: 10
     failureThreshold: 3
 
-# 기본 비활성. Prometheus Operator 가 이 클러스터에 아직 없어 CRD(ServiceMonitor)가 없다.
-# true 로 두면 ArgoCD 가 "no matches for kind ServiceMonitor" 로 Application 전체를
-# Degraded 로 세우고 Deployment 조차 만들지 않는다 (첫 동기화에서 실측). 관측 스택
-# (finch-gitops README "아직 안 된 것" 5번)이 CRD 까지 들여온 뒤에 켤 것.
+# Sprint 3 에서 껐던 것을 다시 켠다. 당시엔 이 클러스터에 Prometheus Operator 가 없어
+# ServiceMonitor CRD 도 없었고, true 로 두면 ArgoCD 가 "no matches for kind ServiceMonitor"
+# 로 Application 전체를 Degraded 로 세우고 Deployment 조차 만들지 않았다 (첫 동기화 실측).
+# 2026-09-04 서버 실측에서 Prometheus Operator 와 ServiceMonitor CRD 를 확인했다.
+#
+# 주의: 이 클러스터의 Grafana 와 Alertmanager 는 누락 Secret 때문에 아직 비정상이다.
+# 지표가 들어오는지는 Grafana 가 아니라 Prometheus 쿼리로 확인할 것 — 대시보드가 비었다고
+# 이 설정을 의심하면 엉뚱한 데서 시간을 태운다.
 metrics:
-  enabled: false
+  enabled: true
   path: /actuator/prometheus
   interval: 60s
   scrapeTimeout: 10s
