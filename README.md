@@ -43,35 +43,47 @@ backend 만 클러스터 내부에서 호출합니다.
 
 ## 아직 안 된 것
 
-이 저장소는 뼈대까지만 있습니다. 서버가 정해져야 채울 수 있는 것들이 남았습니다.
+서버가 정해지며 절반이 사라졌다. **k3s·Argo CD·Sealed Secrets·Prometheus Operator 는
+이미 서버에 있다**(2026-09-04 실측) — 설치하지 않는다. 남은 것은 아래뿐이다.
 
-1. **서버 부트스트랩** — k3s 설치, Sealed Secrets, Argo CD 설치, 루트 앱 apply.
-   서버 사양과 접근 방법이 정해지면 `bootstrap/` 에 스크립트를 넣습니다.
-2. **Secret** — `backend-secrets`, `ai-secrets`, `postgres-*-secret`, `ghcr-pull`.
-   SealedSecret 은 클러스터의 봉인 키로 암호화하므로 클러스터를 만든 뒤에 생성합니다.
-3. **호스트 이름** — values 의 `CHANGEME.example.com` 자리. 도메인이 정해지면 채웁니다.
-4. **이미지 태그** — values 의 `CHANGEME`. 첫 이미지를 빌드한 뒤 채웁니다.
-5. **관측 스택** — Prometheus, Loki, Grafana. compose 쪽 구성이 이미 있으니 옮겨옵니다.
-   **이게 없으면 backend 배포가 막힙니다** — Prometheus Operator(ServiceMonitor CRD)가 없는
-   채로 `apps/prod/backend/values.yaml` 의 `metrics.enabled` 를 켜면 ArgoCD 가
-   `no matches for kind "ServiceMonitor"` 로 Application 전체를 Degraded 로 세우고
-   Deployment 도 만들지 않습니다 (첫 동기화에서 실측). 그래서 지금은 꺼 둔 상태입니다.
-   관측 스택이 CRD 까지 들여온 뒤에 다시 켤 것.
-6. **NetworkPolicy** — 차트가 `networking.finch.io/ingress`, `/metrics` 라벨을
-   자동으로 붙입니다. 그 라벨을 받는 정책을 아직 안 썼습니다.
-7. **TLS 종료** — `charts/microservice/templates/ingress.yaml` 이 `secretName` 없는
-   `tls:` 블록을 렌더합니다. 지금은 Traefik의 self-signed 기본 인증서로 떨어질 뿐,
-   실제 인증서로 끊는 설정은 없습니다. 도메인이 정해지면 둘 중 하나를 만듭니다 —
-   Traefik TLSStore(와일드카드 인증서를 모든 네임스페이스에 제공, Secret 복사 불필요)
-   또는 cert-manager(Let's Encrypt 자동 발급). `infra/nginx/nginx.conf` 가 443 을
-   지운 근거("k8s 에서는 Ingress 가 TLS 를 끊는다")의 반대편이 아직 비어 있다는 뜻이니,
-   이 항목을 채우기 전까지는 그 전제가 완전히 성립하지 않습니다.
+1. 🔴 **Argo CD 가 이 저장소를 읽을 방법** — 저장소가 비공개인데 자격증명이 없다.
+   루트 앱이 `repository not accessible` 로 즉시 멈춘다. **public 전환을 권한다** —
+   SealedSecret 은 공개 저장소에 두라고 만들어진 물건이고 여기에 평문 비밀값은 없다.
+   대안은 `repo` 스코프 PAT 를 Argo CD 에 등록하는 것인데, 그 경로는 PAT 평문이
+   서버 에이전트를 거친다(봉인으로 못 피한다 — 저장소를 읽어야 봉인본을 가져오는데
+   그 읽기 권한을 얻으려는 참이라 순환이다).
+
+2. 🔴 **Secret 세 개** — `backend-secrets` · `finch-origin-tls` (+ 선택 `ghcr-pull`).
+   값이 놓이면 `./scripts/seal.sh` 한 번으로 끝난다. 무엇이 왜 필요한지는
+   애플리케이션 저장소의 `keys.md` 에 있다.
+   `postgres-*-secret` 은 봉인돼 있고, `backend-secrets` 를 만들 때
+   `postgres-backend-secret` 도 **같은 비밀번호로 다시 만들어진다** — 따로 만들면
+   봉인된 값을 되읽을 수 없어 반드시 어긋난다.
+
+3. **NetworkPolicy** — 차트가 `networking.finch.io/*` 라벨을 붙이는데 받는 정책이 없다.
+   **첫 배포 전에 넣지 않기로 했다.** 검증할 클러스터 없이 쓴 정책이 틀리면 배포가
+   실패하는데 그 원인이 네트워크라는 걸 알아내기가 가장 어렵다. 한 번 떠서 정상 동작을
+   확인한 뒤, 그 상태를 기준으로 조인다. 지금은 단일 테넌트라 얻는 것도 적다.
+
+4. **AI 서비스** — 첫 배포에서 껐다(`apps/prod/ai/values.yaml`). `ai-secrets` 와
+   임베딩 10,198청크 복원이 딸려 있어 별개 과제다.
+
+## 이미 된 것
+
+- 호스트 이름 `app.finchapp.org` (frontend `/` · backend `/api`, 같은 호스트라 CORS 없음)
+- 이미지 태그 — CI 가 자동 갱신한다
+- TLS — Ingress 가 네임스페이스 Secret 을 직접 참조한다. 클러스터의 전역 `TLSStore/default`
+  는 삭제됐고 다시 세우지 않는다(전역 기본값이라 나눠 쓸 때 남의 도메인에 우리 인증서가 붙는다)
+- 관측 — Prometheus Operator 가 서버에 있어 `metrics` 를 켰다.
+  다만 **Grafana·Alertmanager 는 누락 Secret 으로 비정상이다.** 지표는 Prometheus 로 본다
 
 ## 애플리케이션 저장소에서 같이 고쳐야 하는 것
 
-**frontend 의 nginx 설정.** 지금 `infra/nginx/nginx.conf` 는 `/api/` 를 backend 로
-프록시합니다. 쿠버네티스에서는 Ingress 가 그 일을 하므로, frontend 이미지의 nginx 는
-정적 파일만 서빙하면 됩니다. proxy_pass 블록과 Jenkins 관련 location 을 걷어내야 합니다.
+**frontend 의 nginx 설정 — 이 항목은 철회한다.** 같은 `infra/nginx/nginx.conf` 를
+로컬 compose 의 nginx 서비스도 쓰고 있어서, `proxy_pass` 를 걷어내면 로컬 개발이 깨진다.
+쿠버네티스에서는 그 블록이 죽은 설정이지만 해롭지 않다 — Ingress 가 `/api` 를 백엔드로
+먼저 채가서 요청이 그 블록에 닿지 않고, upstream 을 변수로 두어 해석이 요청 시점으로
+미뤄지므로 nginx 기동도 막지 않는다.
 
 **ai 의 마이그레이션.** 컨테이너 CMD 가 `alembic upgrade head` 를 실행한 뒤 uvicorn 을
 띄웁니다. replica 가 1 인 동안은 문제가 없지만, 늘리는 순간 동시 마이그레이션이 됩니다.
