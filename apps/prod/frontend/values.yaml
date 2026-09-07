@@ -11,8 +11,13 @@ image:
   digest: ""
   pullPolicy: IfNotPresent
 
-imagePullSecrets:
-  - name: ghcr-pull
+# GHCR 패키지를 public 으로 돌려(2026-09-07 확인) 자격증명이 필요 없다. 비워 둔다.
+#
+# ghcr-pull 을 참조한 채 두면 그 Secret 이 없어 kubelet 이 FailedToRetrieveImagePullSecret
+# 경고를 남긴다. 이미지는 정상적으로 당겨지지만, 첫 배포에서 그 경고가 뜨면 엉뚱한 것을
+# 의심하게 된다. 다시 비공개로 돌리면 scripts/seal.sh 로 ghcr-pull 을 봉인하고 여기에
+# 되돌려 적는다.
+imagePullSecrets: []
 
 deploymentStrategy:
   type: RollingUpdate
