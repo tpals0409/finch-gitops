@@ -47,6 +47,11 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            # 쿠버네티스 기본 /dev/shm 은 64Mi 다. PostgreSQL 은 병렬 작업의
+            # 동적 공유 메모리(dynamic_shared_memory_type=posix)를 여기에 잡는다.
+            # 64Mi 로는 pgvector HNSW 병렬 빌드가 253Mi 세그먼트를 못 잡고 죽는다.
+            - name: dshm
+              mountPath: /dev/shm
           readinessProbe:
             exec:
               command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
@@ -66,6 +71,15 @@ spec:
             limits:
               memory: 1Gi
               cpu: 1000m
+      volumes:
+        # sizeLimit 은 상한이지 예약이 아니다 — tmpfs 는 실제로 쓴 만큼만 컨테이너
+        # 메모리에 잡힌다. 관측된 최대 요구가 253Mi 라 512Mi 로 여유를 둔다.
+        # 이 사용량은 컨테이너 limit(1Gi)에 산입되므로, 올릴 때는 limit 도 같이 본다.
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi
+
   volumeClaimTemplates:
     - metadata:
         name: data
