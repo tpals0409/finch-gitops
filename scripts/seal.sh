@@ -35,9 +35,14 @@ missing=()
 # 다시 돌리면 비밀번호가 바뀐다. 이미 배포된 뒤라면 PVC 안의 DB 는 옛 비밀번호를 그대로
 # 들고 있으므로, 그때는 이 블록을 돌리지 말고 클러스터의 Secret 을 직접 확인할 것.
 ENV_FILE="$FINCH/backend/.env"
-if [ -f "$ENV_FILE" ] && grep -q '^KAKAO_CLIENT_ID=' "$ENV_FILE"; then
+if [ -f "$ENV_FILE" ]; then
   # shellcheck disable=SC1090
   set -a; . "$ENV_FILE"; set +a
+fi
+# **값이 비었는지까지 본다.** 파일에 이름만 적어두고 값을 안 채운 상태가 제일 흔한데,
+# 존재만 확인하면 빈 문자열이 그대로 봉인된다. 그러면 파드는 정상 기동하고 로그인만
+# 죽는다 — 조용히 실패하는 종류다. 여기서 막는 편이 배포 후에 찾는 것보다 싸다.
+if [ -n "${KAKAO_CLIENT_ID:-}" ] && [ -n "${KAKAO_CLIENT_SECRET:-}" ]; then
   # openssl rand 를 쓴다. `tr </dev/urandom | head -c` 는 head 가 파이프를 닫는 순간
   # tr 이 SIGPIPE 로 죽고 pipefail 이 그것을 스크립트 실패로 본다 (실측: exit 141).
   PG_PW="$(openssl rand -hex 20)"
@@ -60,13 +65,13 @@ if [ -f "$ENV_FILE" ] && grep -q '^KAKAO_CLIENT_ID=' "$ENV_FILE"; then
   | seal sealed-backend-secrets.yaml
   echo "✅ postgres-backend-secret · backend-secrets (같은 비밀번호로)"
 else
-  missing+=("backend-secrets — $ENV_FILE 에 KAKAO_CLIENT_ID · KAKAO_CLIENT_SECRET")
+  missing+=("backend-secrets — $ENV_FILE 의 KAKAO_CLIENT_ID · KAKAO_CLIENT_SECRET (이름만 있고 값이 비어도 건너뛴다)")
 fi
 
 # ── finch-origin-tls ─────────────────────────────────────────────────────────
 # Ingress 가 secretName 으로 직접 참조한다. 없으면 Traefik self-signed 로 떨어지고,
 # Cloudflare SSL 이 Full (strict) 이면 526 이 뜬다.
-if [ -f "$FINCH/backend/origin.crt" ] && [ -f "$FINCH/backend/origin.key" ]; then
+if [ -s "$FINCH/backend/origin.crt" ] && [ -s "$FINCH/backend/origin.key" ]; then
   kubectl create secret tls finch-origin-tls -n "$NS" --dry-run=client -o yaml \
     --cert="$FINCH/backend/origin.crt" --key="$FINCH/backend/origin.key" \
   | seal sealed-origin-tls.yaml
