@@ -19,7 +19,16 @@ metadata:
   namespace: finch-prod
 spec:
   serviceName: postgres-ai
-  replicas: 1
+  # ⚠️ **일시적으로 0 이다. 되돌릴 커밋이 곧 따라온다.**
+  #
+  # ai-secrets 를 봉인하며 postgres-ai 비밀번호가 새로 만들어졌는데, PVC 안의 DB 는 옛 값을
+  # 그대로 들고 있어 붙지 못한다. 그 DB 는 코퍼스 복원 전이라 비어 있어 버려도 된다.
+  #
+  # 파드를 내려야 PVC 를 지울 수 있고, kubectl 로 내리면 Argo CD 가 self-heal 로 즉시 되돌린다
+  # (실제로 그렇게 막혔다). 선언이 진실이므로 여기서 내린다.
+  #
+  # 순서: 이 커밋 → 파드 종료 확인 → PVC(data-postgres-ai-0) 삭제 → replicas 1 복구 커밋
+  replicas: 0
   selector:
     matchLabels:
       app: postgres-ai
