@@ -104,6 +104,23 @@ env:
     value: redis
   - name: REDIS_PORT
     value: "6379"
+  # KIS 시세 수집 (#46). 2026-09-07 서버 실측으로 확정했다.
+  # 모의 호스트에서 운영 코드와 동일한 inquire-price 요청이 rt_cd=0 · stck_prpr=270000(005930)
+  # 으로 돌아왔다. 실전 호스트는 토큰 발급만 되고 조회는 확인하지 않았으므로 쓰지 않는다.
+  - name: KIS_BASE_URL
+    value: "https://openapivts.koreainvestment.com:29443"
+  # 모의 한도는 공식 SDK 의 _smartSleep = 0.5 — 초당 2건이다. 실전값 50ms 는 이 자격증명으로
+  # 검증하지 않았다. 지금 핫셋이 1종목(운영 DB 실측)이라 초당 0.33건이고, 이 값은 핫셋이
+  # 30종목을 넘을 때 처음 아프다. 그때 실제로 재고 바꾼다 — 그래서 상수가 아니라 주입값이다.
+  - name: KIS_MIN_REQUEST_INTERVAL
+    value: "500ms"
+  - name: KIS_PRICE_BATCH_SIZE
+    value: "6"
+  # 수집기 스위치. FINCH#55 머지 후 KST 평일 정규장에 true 로 바꾼다.
+  # ⚠️ 위 세 값 없이 true 로 두면 @Value 주입이 실패해 컨텍스트가 안 뜬다 — 로그가 아니라
+  # 파드 crashloop 다. 켜는 변경과 값 주입을 절대 나눠 커밋하지 않는다.
+  - name: KIS_PRICE_ENABLED
+    value: "false"
 
 resources:
   requests:
