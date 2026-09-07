@@ -1,9 +1,13 @@
 # 네임스페이스는 다른 무엇보다 먼저 만들어져야 한다.
+#
+# 이름을 platform-namespaces 로 되돌리지 말 것. 같은 클러스터의 PinLog 가
+# 그 이름을 먼저 썼고, monitoring 네임스페이스에 추적 마커가 남아 있다.
+# 이름이 겹치면 Argo 가 남의 monitoring 을 우리 prune 후보로 집는다.
 # sync-wave "0" 으로 서비스(wave 1)보다 앞선다.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: platform-namespaces
+  name: finch-namespaces
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
