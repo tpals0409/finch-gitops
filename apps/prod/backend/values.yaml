@@ -116,11 +116,11 @@ env:
     value: "500ms"
   - name: KIS_PRICE_BATCH_SIZE
     value: "6"
-  # 수집기 스위치. FINCH#55 머지 후 KST 평일 정규장에 true 로 바꾼다.
+  # 수집기 스위치. 2026-09-08 정규장 개장 전에 켰다 (Sprint 9 #46 실가동 검증).
   # ⚠️ 위 세 값 없이 true 로 두면 @Value 주입이 실패해 컨텍스트가 안 뜬다 — 로그가 아니라
   # 파드 crashloop 다. 켜는 변경과 값 주입을 절대 나눠 커밋하지 않는다.
   - name: KIS_PRICE_ENABLED
-    value: "false"
+    value: "true"
 
 resources:
   requests:
