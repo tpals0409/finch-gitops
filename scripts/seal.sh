@@ -10,6 +10,7 @@
 # 필요한 것 (없으면 그 항목만 건너뛰고 무엇이 없는지 알려준다):
 #   $FINCH/backend/.env        KAKAO_CLIENT_ID · KAKAO_CLIENT_SECRET
 #                              (POSTGRES_PASSWORD 는 이 스크립트가 만든다)
+#   $FINCH/ai/.env             KIS_APP_KEY · KIS_APP_SECRET (있으면 함께 봉인한다)
 #   $FINCH/backend/origin.crt  Cloudflare Origin Certificate
 #   $FINCH/backend/origin.key  그 개인키
 #   GHCR_PAT (환경변수)         read:packages 스코프. 패키지를 public 으로 돌렸으면 불필요
@@ -55,6 +56,19 @@ if [ -n "${KAKAO_CLIENT_ID:-}" ] && [ -n "${KAKAO_CLIENT_SECRET:-}" ]; then
 
   # 이름은 application.yaml 이 읽는 그대로다. 하나라도 빠지면 파드가 기동에 실패한다 —
   # 비밀값에 기본값을 두지 않기로 한 규칙의 대가이자 목적이다(조용히 틀린 값으로 붙지 않는다).
+  # KIS 키는 ai/.env 에 있다. 발급만 받고 아직 아무도 쓰지 않던 값인데, 배포 후 서버에서
+  # 토큰을 발급해 **IP 화이트리스트 요구 여부를 판명하는 것**이 이번 배포의 목적이라
+  # 파드 안에 있어야 한다. 없으면 그 확인 자체를 할 수단이 없다.
+  KIS_ARGS=()
+  if [ -f "$FINCH/ai/.env" ]; then
+    KIS_APP_KEY=$(grep '^KIS_APP_KEY=' "$FINCH/ai/.env" | cut -d= -f2-)
+    KIS_APP_SECRET=$(grep '^KIS_APP_SECRET=' "$FINCH/ai/.env" | cut -d= -f2-)
+    if [ -n "$KIS_APP_KEY" ] && [ -n "$KIS_APP_SECRET" ]; then
+      KIS_ARGS=(--from-literal=KIS_APP_KEY="$KIS_APP_KEY"
+                --from-literal=KIS_APP_SECRET="$KIS_APP_SECRET")
+    fi
+  fi
+
   kubectl create secret generic backend-secrets -n "$NS" --dry-run=client -o yaml \
     --from-literal=JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 48)}" \
     --from-literal=KAKAO_CLIENT_ID="$KAKAO_CLIENT_ID" \
@@ -62,8 +76,13 @@ if [ -n "${KAKAO_CLIENT_ID:-}" ] && [ -n "${KAKAO_CLIENT_SECRET:-}" ]; then
     --from-literal=POSTGRES_USER=finch \
     --from-literal=POSTGRES_PASSWORD="$PG_PW" \
     --from-literal=POSTGRES_DB=finch_db \
+    "${KIS_ARGS[@]}" \
   | seal sealed-backend-secrets.yaml
-  echo "✅ postgres-backend-secret · backend-secrets (같은 비밀번호로)"
+  if [ ${#KIS_ARGS[@]} -gt 0 ]; then
+    echo "✅ postgres-backend-secret · backend-secrets (같은 비밀번호로, KIS 키 포함)"
+  else
+    echo "✅ postgres-backend-secret · backend-secrets (같은 비밀번호로, KIS 키 없음)"
+  fi
 else
   missing+=("backend-secrets — $ENV_FILE 의 KAKAO_CLIENT_ID · KAKAO_CLIENT_SECRET (이름만 있고 값이 비어도 건너뛴다)")
 fi
