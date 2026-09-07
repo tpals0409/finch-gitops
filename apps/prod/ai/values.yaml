@@ -1,16 +1,14 @@
-# 첫 배포에서 AI 를 뺀다. 차트가 이 스위치 하나로 모든 리소스 렌더를 건너뛴다.
+# AI 는 아직 끄고 둔다. 차트가 이 스위치 하나로 모든 리소스 렌더를 건너뛴다.
 #
 # ApplicationSet 이 apps/prod/* 를 훑어 Application 을 자동 생성하므로 디렉터리를 두면
-# 배포 대상이 된다. 그런데 ai-secrets 가 아직 없어 지금 올리면 CrashLoopBackOff 에 빠진다.
-# Secret 을 미리 만들지 않는 이유는 AI 의 내부 토큰 계약이 아직 없어서다 — 백엔드에 AI 중계가
-# 없어(domain/ai 에 예외 클래스 하나뿐) 지금 만든 토큰은 아무도 안 쓰고, 중계가 붙을 때
-# 다시 봉인해야 한다.
+# 배포 대상이 된다.
 #
-# 첫 배포의 목적은 KIS 가 이 서버에서 실제로 뚫리는지 확인하는 것이고 거기에 AI 는 필요 없다.
-# 부품이 적을수록 첫 동기화가 왜 실패했는지 알아내기 쉽다. AI 는 임베딩 10,198청크 복원이라는
-# 별개 숙제도 달고 있다 (ai/docs/seed-dataset.md).
+# 남은 것은 **코퍼스**다. ai-secrets 봉인과 백엔드 AI 중계(`/api/v1/ai/**`)는 끝났지만,
+# postgres-ai 는 initdb 직후라 비어 있다 — document_chunks 10,198청크의 임베딩은 다시
+# 만들 수 없어(일일 토큰 예산의 몇 배다) 백업본 복원이 유일한 길이다
+# (ai/docs/seed-dataset.md). 지금 켜면 파드는 뜨지만 모든 검색이 근거 없이 답한다.
 #
-# 켤 때 할 일: ai-secrets 봉인(DATABASE_URL 을 postgres-ai 주소로 다시 쓸 것) → 이 값을 true.
+# 켤 때 할 일: 코퍼스 복원 → 이 값을 true.
 application:
   enabled: false
 
@@ -80,6 +78,13 @@ envFrom:
 env:
   - name: TZ
     value: Asia/Seoul
+  # 백엔드 ↔ AI 서비스 간 공유 토큰. envFrom 이 아니라 여기서 읽는 이유는
+  # scripts/seal.sh 의 finch-service-token 블록에 적혀 있다 (env 가 envFrom 을 이긴다).
+  - name: BACKEND_SERVICE_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: finch-service-token
+        key: BACKEND_SERVICE_TOKEN
   # compose 가 environment 로 env_file 을 덮어썼던 것과 같은 의도.
   # APP_ENV 기본값이 local 이고, local 에서는 내부 토큰 검증이 통째로 꺼진다
   # (ai/app/api/deps.py). 여기서 명시해 인증을 fail-closed 로 닫는다.

@@ -1,0 +1,13 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: finch-service-token
+  namespace: finch-prod
+spec:
+  encryptedData:
+    BACKEND_SERVICE_TOKEN: AgC7obg8uesnMjw565rjW1bkgRv9wRNQhSpa1w9/hYPtsr1374fd7uZaZ4vjMtNLBbq1VbFr/4ToWwXH0QlKKNXjKCRtv9eR1QuFbDYMyvqgf5e+zLjRozRobZ3hiEk3zeYcARxRvHV0iLMLgUAhGUTahiXdKMlWMHamhQ6mXDJUVf0ugBLd9XvqeQ9ZmIF+yv0OgkrSLXH3/Y0F+jyGLlLSTEPndA67veW+Fjgmxiu5oB4WaeH7Eu5/g3W0/ohlzDGvk/saKJeAzfwooE+SE/AmT4LYGp75gEqCYvSFVJ9uCXQHmM/Vw+x5bognz6FesGQQTT0lPpGEJaMdBton7KcdBuvHETDRIcHvQvVDIhAvHnoYz5uFM5XI3vlZJ9mBy/P7w+/E0IuoYuJfiNK8Tn3Aqs9pDIMTtKmJjIzUTivv8zvxmm9sH6cJu5dbj2e35LUjb31DiR0HADyw1k5Gx84AxuzQIPrDX/tLdSdET4VDr4xAREJtAAh4yD5eGaG4CI8AN08WfhXWroJv9ICQlRoHof2Dhh6OqQr9lI6I9OoQQT4gp5wBRz/hRHis0UA0nBlm5Sei4rIYtKf8LI2RkAiy+n7h+yTGjCCk3/GXNkyuV2RG5qHjQ455FR+LMaMIKuVYxdnzV0lHhOx97wxg+2ocu2jFDsiGORZDZLbjjSaLNaRRXI7eZrPiFUPdnNrJRlv/wO/Is5ilQ7BDMojMSlxBsQIeirR3Hfc7eoh2zq55VPIkDdfwGDoMF/JNODgWWzyPc7EYC+M9fO9P6/bQg3gg
+  template:
+    metadata:
+      name: finch-service-token
+      namespace: finch-prod

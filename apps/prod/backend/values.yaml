@@ -86,6 +86,13 @@ envFrom:
 env:
   - name: TZ
     value: Asia/Seoul
+  # 백엔드 ↔ AI 서비스 간 공유 토큰. envFrom 이 아니라 여기서 읽는 이유는
+  # scripts/seal.sh 의 finch-service-token 블록에 적혀 있다 (env 가 envFrom 을 이긴다).
+  - name: BACKEND_SERVICE_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: finch-service-token
+        key: BACKEND_SERVICE_TOKEN
   # compose 는 mem_limit 1536m 이었다. JVM 이 컨테이너 상한을 넘지 않게 비율로 묶는다.
   - name: JAVA_TOOL_OPTIONS
     value: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"

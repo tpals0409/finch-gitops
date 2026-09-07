@@ -43,10 +43,19 @@ seal() {
 }
 missing=()
 
+# ── finch-service-token ──────────────────────────────────────────────────────
 # 백엔드와 AI 가 **같은 값**을 가져야 하는 내부 토큰. AI 는 prod 에서 이 값이 없으면
 # 모든 요청을 internal_token_not_configured 로 거절한다 (ai/app/api/deps.py).
-# 따로 만들면 반드시 어긋나므로 여기서 한 번 만들어 양쪽에 넣는다 — postgres 비밀번호와 같은 이유.
-SERVICE_TOKEN="$(openssl rand -hex 32)"
+#
+# **자기 Secret 을 따로 쓴다.** 처음엔 backend-secrets · ai-secrets 양쪽에 같은 값을 넣었는데,
+# 두 봉인본은 각자 DB 비밀번호를 품고 있어 한쪽만 다시 만들 수가 없다 — 토큰을 맞추려면
+# 멀쩡한 원장 DB 의 비밀번호까지 갈아엎어야 했다. 공유하는 값은 공유하는 자리에 둔다.
+#
+# ai-secrets 안에는 옛 BACKEND_SERVICE_TOKEN 이 아직 남아 있다. 두 values.yaml 이 이 값을
+# envFrom 이 아니라 env + secretKeyRef 로 읽으므로 그쪽이 확정적으로 이긴다 (env > envFrom).
+kubectl create secret generic finch-service-token -n "$NS" --dry-run=client -o yaml \
+  --from-literal=BACKEND_SERVICE_TOKEN="$(openssl rand -hex 32)" \
+| seal sealed-service-token.yaml
 
 # ── postgres-backend-secret + backend-secrets ────────────────────────────────
 # **둘을 한 번에 만든다.** 백엔드가 DB 에 붙으려면 같은 비밀번호를 알아야 하는데, 봉인된
@@ -96,7 +105,6 @@ if [ -n "${KAKAO_CLIENT_ID:-}" ] && [ -n "${KAKAO_CLIENT_SECRET:-}" ]; then
     --from-literal=POSTGRES_USER=finch \
     --from-literal=POSTGRES_PASSWORD="$PG_PW" \
     --from-literal=POSTGRES_DB=finch_db \
-    --from-literal=BACKEND_SERVICE_TOKEN="$SERVICE_TOKEN" \
     "${KIS_ARGS[@]}" \
   | seal sealed-backend-secrets.yaml
   # 무엇이 새로 만들어졌는지는 위의 파일별 ✅ / ⏭ 가 말한다.
@@ -133,7 +141,6 @@ if [ -n "${GMS_KEY:-}" ]; then
   kubectl create secret generic ai-secrets -n "$NS" --dry-run=client -o yaml \
     --from-literal=DATABASE_URL="postgresql+asyncpg://ai_invest:${PG_AI_PW}@postgres-ai:5432/ai_invest" \
     --from-literal=GMS_KEY="$GMS_KEY" \
-    --from-literal=BACKEND_SERVICE_TOKEN="$SERVICE_TOKEN" \
     --from-literal=DART_API_KEY="${DART_API_KEY:-}" \
     --from-literal=KRX_API_KEY="${KRX_API_KEY:-}" \
     --from-literal=NAVER_CLIENT_ID="${NAVER_CLIENT_ID:-}" \
