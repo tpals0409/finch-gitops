@@ -10,7 +10,7 @@
 # 필요한 것 (없으면 그 항목만 건너뛰고 무엇이 없는지 알려준다):
 #   $FINCH/backend/.env        KAKAO_CLIENT_ID · KAKAO_CLIENT_SECRET
 #                              (POSTGRES_PASSWORD 는 이 스크립트가 만든다)
-#   $FINCH/ai/.env             KIS_APP_KEY · KIS_APP_SECRET (있으면 함께 봉인한다)
+#   $FINCH/ai/.env             KIS_APP_KEY · KIS_APP_SECRET · GMS_KEY · DART · KRX · NAVER
 #   $FINCH/backend/origin.crt  Cloudflare Origin Certificate
 #   $FINCH/backend/origin.key  그 개인키
 #   GHCR_PAT (환경변수)         read:packages 스코프. 패키지를 public 으로 돌렸으면 불필요
@@ -25,8 +25,28 @@ FINCH="${FINCH:-$HOME/Desktop/FINCH}"
 command -v kubeseal >/dev/null || { echo "kubeseal 이 없다: brew install kubeseal"; exit 1; }
 [ -f "$CERT" ] || { echo "봉인 공개키가 없다: $CERT"; exit 1; }
 
-seal() { kubeseal --cert "$CERT" --format yaml > "$OUT/$1"; }
+# 이미 있는 봉인본은 **덮어쓰지 않는다.** postgres 비밀번호는 PVC 안의 DB 가 함께 들고 있어서,
+# 다시 만들면 새 Secret 으로는 붙지 못한다 — 고치려면 PVC 를 지워야 하고 그건 데이터를 버리는
+# 일이다. 실제로 이 스크립트를 배포 후에 다시 돌려 그 사고가 날 뻔했다.
+#
+# 의도적으로 다시 만들려면 FORCE=1 을 준다. 그때는 해당 PVC 도 같이 지워야 한다.
+# 이 함수는 파이프 오른쪽에서 돌아 **서브셸**이다. 바깥 배열에 쌓아도 부모에 안 남으므로
+# 건너뛴 사실을 여기서 바로 찍는다 (실측으로 확인한 함정이다).
+seal() {
+  if [ -f "$OUT/$1" ] && [ "${FORCE:-}" != "1" ]; then
+    cat > /dev/null                      # 파이프를 비워 SIGPIPE 를 막는다
+    echo "⏭  $1 — 이미 있어 그대로 둔다 (FORCE=1 로 강제. PVC 도 같이 지워야 한다)"
+    return
+  fi
+  kubeseal --cert "$CERT" --format yaml > "$OUT/$1"
+  echo "✅ $1"
+}
 missing=()
+
+# 백엔드와 AI 가 **같은 값**을 가져야 하는 내부 토큰. AI 는 prod 에서 이 값이 없으면
+# 모든 요청을 internal_token_not_configured 로 거절한다 (ai/app/api/deps.py).
+# 따로 만들면 반드시 어긋나므로 여기서 한 번 만들어 양쪽에 넣는다 — postgres 비밀번호와 같은 이유.
+SERVICE_TOKEN="$(openssl rand -hex 32)"
 
 # ── postgres-backend-secret + backend-secrets ────────────────────────────────
 # **둘을 한 번에 만든다.** 백엔드가 DB 에 붙으려면 같은 비밀번호를 알아야 하는데, 봉인된
@@ -76,15 +96,51 @@ if [ -n "${KAKAO_CLIENT_ID:-}" ] && [ -n "${KAKAO_CLIENT_SECRET:-}" ]; then
     --from-literal=POSTGRES_USER=finch \
     --from-literal=POSTGRES_PASSWORD="$PG_PW" \
     --from-literal=POSTGRES_DB=finch_db \
+    --from-literal=BACKEND_SERVICE_TOKEN="$SERVICE_TOKEN" \
     "${KIS_ARGS[@]}" \
   | seal sealed-backend-secrets.yaml
-  if [ ${#KIS_ARGS[@]} -gt 0 ]; then
-    echo "✅ postgres-backend-secret · backend-secrets (같은 비밀번호로, KIS 키 포함)"
-  else
-    echo "✅ postgres-backend-secret · backend-secrets (같은 비밀번호로, KIS 키 없음)"
-  fi
+  # 무엇이 새로 만들어졌는지는 위의 파일별 ✅ / ⏭ 가 말한다.
 else
   missing+=("backend-secrets — $ENV_FILE 의 KAKAO_CLIENT_ID · KAKAO_CLIENT_SECRET (이름만 있고 값이 비어도 건너뛴다)")
+fi
+
+# ── postgres-ai-secret + ai-secrets ──────────────────────────────────────────
+# **둘을 한 번에 만든다.** AI 의 DATABASE_URL 이 postgres-ai 비밀번호를 품는데 봉인된 값은
+# 되읽을 수 없다 — 백엔드 쪽과 똑같은 이유다.
+#
+# ⚠️ **postgres-ai 가 이미 떠 있었다면 PVC 를 지워야 한다.** PVC 안의 DB 는 옛 비밀번호를
+# 그대로 들고 있어 새 Secret 으로는 붙지 못한다. 그 DB 는 코퍼스 복원 전이라 비어 있다.
+AI_ENV="$FINCH/ai/.env"
+if [ -f "$AI_ENV" ]; then
+  GMS_KEY=$(grep '^GMS_KEY=' "$AI_ENV" | cut -d= -f2-)
+  DART_API_KEY=$(grep '^DART_API_KEY=' "$AI_ENV" | cut -d= -f2-)
+  KRX_API_KEY=$(grep '^KRX_API_KEY=' "$AI_ENV" | cut -d= -f2-)
+  NAVER_CLIENT_ID=$(grep '^NAVER_CLIENT_ID=' "$AI_ENV" | cut -d= -f2-)
+  NAVER_CLIENT_SECRET=$(grep '^NAVER_CLIENT_SECRET=' "$AI_ENV" | cut -d= -f2-)
+fi
+
+if [ -n "${GMS_KEY:-}" ]; then
+  PG_AI_PW="$(openssl rand -hex 20)"
+
+  kubectl create secret generic postgres-ai-secret -n "$NS" --dry-run=client -o yaml \
+    --from-literal=POSTGRES_USER=ai_invest \
+    --from-literal=POSTGRES_PASSWORD="$PG_AI_PW" \
+    --from-literal=POSTGRES_DB=ai_invest \
+  | seal sealed-postgres-ai.yaml
+
+  # DATABASE_URL 은 클러스터 주소다. 로컬 .env 의 localhost 를 그대로 쓰면 파드가 자기
+  # 안을 찾는다. asyncpg 드라이버 표기도 앱이 기대하는 그대로여야 한다 (ai/app/core/config.py).
+  kubectl create secret generic ai-secrets -n "$NS" --dry-run=client -o yaml \
+    --from-literal=DATABASE_URL="postgresql+asyncpg://ai_invest:${PG_AI_PW}@postgres-ai:5432/ai_invest" \
+    --from-literal=GMS_KEY="$GMS_KEY" \
+    --from-literal=BACKEND_SERVICE_TOKEN="$SERVICE_TOKEN" \
+    --from-literal=DART_API_KEY="${DART_API_KEY:-}" \
+    --from-literal=KRX_API_KEY="${KRX_API_KEY:-}" \
+    --from-literal=NAVER_CLIENT_ID="${NAVER_CLIENT_ID:-}" \
+    --from-literal=NAVER_CLIENT_SECRET="${NAVER_CLIENT_SECRET:-}" \
+  | seal sealed-ai-secrets.yaml
+else
+  missing+=("ai-secrets — $AI_ENV 의 GMS_KEY")
 fi
 
 # ── finch-origin-tls ─────────────────────────────────────────────────────────
@@ -94,7 +150,6 @@ if [ -s "$FINCH/backend/origin.crt" ] && [ -s "$FINCH/backend/origin.key" ]; the
   kubectl create secret tls finch-origin-tls -n "$NS" --dry-run=client -o yaml \
     --cert="$FINCH/backend/origin.crt" --key="$FINCH/backend/origin.key" \
   | seal sealed-origin-tls.yaml
-  echo "✅ finch-origin-tls"
 else
   missing+=("finch-origin-tls — $FINCH/backend/origin.crt · origin.key")
 fi
@@ -106,7 +161,6 @@ if [ -n "${GHCR_PAT:-}" ]; then
   kubectl create secret docker-registry ghcr-pull -n "$NS" --dry-run=client -o yaml \
     --docker-server=ghcr.io --docker-username=tpals0409 --docker-password="$GHCR_PAT" \
   | seal sealed-ghcr-pull.yaml
-  echo "✅ ghcr-pull"
 else
   missing+=("ghcr-pull — GHCR_PAT 환경변수 (패키지가 public 이면 건너뛴다)")
 fi
