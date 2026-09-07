@@ -1,16 +1,17 @@
-# AI 는 아직 끄고 둔다. 차트가 이 스위치 하나로 모든 리소스 렌더를 건너뛴다.
+# AI 를 켠다. 차트가 이 스위치 하나로 모든 리소스 렌더를 정한다.
 #
-# ApplicationSet 이 apps/prod/* 를 훑어 Application 을 자동 생성하므로 디렉터리를 두면
-# 배포 대상이 된다.
+# **코퍼스보다 먼저 켠다.** 스키마를 만드는 것이 AI 파드 기동 시의 alembic 이라, 빈 DB 에는
+# 넣을 테이블이 없다. 순서와 복원 절차는 FINCH `docs/ops/deploy-runbook.md` §6 에 있다.
 #
-# 남은 것은 **코퍼스**다. ai-secrets 봉인과 백엔드 AI 중계(`/api/v1/ai/**`)는 끝났지만,
-# postgres-ai 는 initdb 직후라 비어 있다 — document_chunks 10,198청크의 임베딩은 다시
-# 만들 수 없어(일일 토큰 예산의 몇 배다) 백업본 복원이 유일한 길이다
-# (ai/docs/seed-dataset.md). 지금 켜면 파드는 뜨지만 모든 검색이 근거 없이 답한다.
+# 코퍼스가 비어 있는 동안 AI 는 고장이 아니다 — 검색이 빈 결과를 돌려주고 "관련 자료를
+# 찾지 못했습니다" 로 답한다 (AI 명세 §3 "근거 없음 은 에러가 아닙니다"). document_chunks
+# 10,198청크는 다시 만들 수 없어(일일 토큰 예산의 몇 배다) 백업본 복원이 유일한 길이고,
+# 그 백업본은 FINCH 릴리스 `ai-corpus-20260907` 에 있다.
 #
-# 켤 때 할 일: 코퍼스 복원 → 이 값을 true.
+# 외부로 열지 않는다. ingress 가 없고 backend 만 http://ai:8000 으로 부른다 — AI 는
+# X-User-Id 를 검증 없이 신뢰하므로 외부에서 닿으면 누구나 남의 데이터를 읽는다.
 application:
-  enabled: false
+  enabled: true
 
 # ai — FastAPI. compose 의 ai 서비스를 옮긴 것.
 # 외부로 열지 않는다. backend 가 클러스터 내부에서만 호출한다.
