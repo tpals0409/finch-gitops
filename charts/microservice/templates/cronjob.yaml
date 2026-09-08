@@ -6,6 +6,11 @@
 {{- if not $job.command }}
 {{- fail (printf "cronJobs.%s.command is required" $name) }}
 {{- end }}
+{{- /* timeZone 을 안 적으면 컨트롤러의 로컬 시간대로 해석된다 — 우리 클러스터에서
+       실제로 9시간 어긋나 돌았다. 조용히 틀리는 종류라 기본값을 두지 않고 막는다. */}}
+{{- if not $job.timeZone }}
+{{- fail (printf "cronJobs.%s.timeZone is required (예: \"Asia/Seoul\"). 생략하면 컨트롤러 로컬 시간대로 해석된다" $name) }}
+{{- end }}
 {{- $fullName := printf "%s-%s" (include "microservice.fullname" $) $name }}
 {{- /* Job 이름은 CronJob 이름에 타임스탬프를 붙여 만든다. 63 이 아니라 52 가 상한이다. */}}
 {{- if gt (len $fullName) 52 }}
@@ -20,10 +25,14 @@ metadata:
     {{- include "microservice.labels" $ | nindent 4 }}
     app.kubernetes.io/component: cronjob
 spec:
-  # ⚠️ 컨트롤러가 이 표현식을 UTC 로 읽는다. 파드 안의 TZ(Asia/Seoul)와 무관하다.
-  # timeZone 필드는 k8s 1.27+ 에서만 동작하고 그 아래에서는 조용히 무시돼 9시간
-  # 어긋난 시각에 돈다. 클러스터 버전을 확인하기 전에는 UTC 로만 적는다.
+  # ⚠️ timeZone 이 없으면 컨트롤러의 **로컬** 시간대로 해석된다. UTC 가 아니다.
+  # 여기서 실제로 그렇게 틀렸다 — "30 22" 를 22:30 UTC 로 적어놨는데 컨트롤러가
+  # Asia/Seoul 로 읽어 13:30Z(=22:30 KST)에 돌았다. 의도는 07:30 KST 였다.
+  # 근거: lastScheduleTime=2026-09-08T13:30:00Z (Pico 관측, 2026-09-09).
+  # 그래서 schedule 은 항상 timeZone 과 짝으로 적는다 — 위에서 강제한다.
+  # 클러스터는 v1.36.2+k3s1 이라 .spec.timeZone 을 지원한다 (1.27+).
   schedule: {{ $job.schedule | quote }}
+  timeZone: {{ $job.timeZone | quote }}
   # 앞 실행이 안 끝났는데 다음이 겹쳐 뜨면 같은 외부 API 를 두 배로 때린다.
   concurrencyPolicy: {{ $job.concurrencyPolicy | default "Forbid" }}
   # 컨트롤러가 멈췄다 살아나면 밀린 실행이 한꺼번에 뜬다. 그 창을 닫는다.

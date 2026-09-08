@@ -97,14 +97,15 @@ bootstrap:
 # 정기 배치. 이름을 키로 하나씩 적으면 CronJob 이 하나씩 생긴다.
 # 기본은 비어 있다 — 아무것도 적지 않은 서비스에는 아무것도 안 생긴다.
 #
-# ⚠️ schedule 은 **UTC** 다. 파드 안의 TZ 와 무관하게 컨트롤러가 UTC 로 읽는다.
-#    KST 로 적고 싶어지는 자리이니 값 옆에 KST 환산을 주석으로 남길 것.
-#    timeZone 필드는 k8s 1.27+ 전용이고 그 아래에서는 조용히 무시된다 —
-#    9시간 어긋난 시각에 도는 형태로 나타나므로 버전 확인 전에는 쓰지 않는다.
+# ⚠️ schedule 은 timeZone 과 **반드시 짝으로** 적는다. timeZone 이 없으면 UTC 가 아니라
+#    컨트롤러의 로컬 시간대로 해석된다 — 우리 클러스터에서 실제로 9시간 어긋나 돌았다.
+#    템플릿이 timeZone 없는 cronJob 을 렌더 단계에서 실패시킨다.
+#    그러니 표현식은 현지 시각 그대로 적으면 된다. UTC 환산을 손으로 하지 않는다.
 #
 #   cronJobs:
 #     price-snapshots:
-#       schedule: "30 22 * * *"        # 22:30 UTC = 07:30 KST
+#       schedule: "30 7 * * *"         # 07:30 Asia/Seoul
+#       timeZone: "Asia/Seoul"
 #       command: ["python", "-m", "ingest.price_snapshots"]
 #
 # 이름은 <릴리스>-<키> 로 만들어지며 52자를 넘으면 렌더가 실패한다
