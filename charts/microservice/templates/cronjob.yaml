@@ -1,0 +1,93 @@
+{{- if .Values.application.enabled }}
+{{- range $name, $job := .Values.cronJobs }}
+{{- if not $job.schedule }}
+{{- fail (printf "cronJobs.%s.schedule is required" $name) }}
+{{- end }}
+{{- if not $job.command }}
+{{- fail (printf "cronJobs.%s.command is required" $name) }}
+{{- end }}
+{{- $fullName := printf "%s-%s" (include "microservice.fullname" $) $name }}
+{{- /* Job 이름은 CronJob 이름에 타임스탬프를 붙여 만든다. 63 이 아니라 52 가 상한이다. */}}
+{{- if gt (len $fullName) 52 }}
+{{- fail (printf "CronJob name %q must not exceed 52 characters" $fullName) }}
+{{- end }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "microservice.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: cronjob
+spec:
+  # ⚠️ 컨트롤러가 이 표현식을 UTC 로 읽는다. 파드 안의 TZ(Asia/Seoul)와 무관하다.
+  # timeZone 필드는 k8s 1.27+ 에서만 동작하고 그 아래에서는 조용히 무시돼 9시간
+  # 어긋난 시각에 돈다. 클러스터 버전을 확인하기 전에는 UTC 로만 적는다.
+  schedule: {{ $job.schedule | quote }}
+  # 앞 실행이 안 끝났는데 다음이 겹쳐 뜨면 같은 외부 API 를 두 배로 때린다.
+  concurrencyPolicy: {{ $job.concurrencyPolicy | default "Forbid" }}
+  # 컨트롤러가 멈췄다 살아나면 밀린 실행이 한꺼번에 뜬다. 그 창을 닫는다.
+  startingDeadlineSeconds: {{ $job.startingDeadlineSeconds | default 300 }}
+  successfulJobsHistoryLimit: {{ $job.successfulJobsHistoryLimit | default 1 }}
+  failedJobsHistoryLimit: {{ $job.failedJobsHistoryLimit | default 3 }}
+  suspend: {{ $job.suspend | default false }}
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "microservice.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: cronjob
+    spec:
+      # 무한 재시도는 실패한 외부 호출을 두들기는 것과 같다.
+      backoffLimit: {{ $job.backoffLimit | default 2 }}
+      activeDeadlineSeconds: {{ $job.activeDeadlineSeconds | default 900 }}
+      template:
+        metadata:
+          labels:
+            {{- include "microservice.selectorLabels" $ | nindent 12 }}
+            app.kubernetes.io/part-of: finch
+            app.kubernetes.io/component: cronjob
+        spec:
+          restartPolicy: Never
+          {{- with $.Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "microservice.serviceAccountName" $ }}
+          containers:
+            - name: {{ $name }}
+              image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}{{- with $.Values.image.digest }}@{{ . }}{{- end }}"
+              imagePullPolicy: {{ $.Values.image.pullPolicy }}
+              command:
+                {{- toYaml $job.command | nindent 16 }}
+              {{- with $.Values.env }}
+              env:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- with $.Values.envFrom }}
+              envFrom:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              resources:
+                {{- toYaml ($job.resources | default $.Values.resources) | nindent 16 }}
+              {{- with $.Values.securityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+          {{- with $.Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+{{- end }}
