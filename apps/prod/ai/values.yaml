@@ -115,13 +115,16 @@ serviceAccount:
 # 스냅샷 적재 배치. FINCH #70 (a315fcc) 이 `python -m ingest.price_snapshots` 를 넣었고
 # 이미지 sha-a315fccc5a08 부터 들어 있다.
 #
-# ⚠️ schedule 은 UTC 다. 컨트롤러가 이 표현식을 UTC 로 읽고, 파드의 TZ(Asia/Seoul)와
-# 무관하다. timeZone 필드는 k8s 1.27+ 전용이라 쓰지 않는다.
+# ⚠️ 이 잡은 07:30 KST 를 의도했는데 22:30 KST 에 돌고 있었다. "30 22" 를 22:30 UTC 로
+# 적었지만 timeZone 이 없으면 컨트롤러 로컬 시간대(Asia/Seoul)로 해석되기 때문이다.
+# 근거: lastScheduleTime=2026-09-08T13:30:00Z = 22:30 KST (Pico 관측, 2026-09-09).
+# 클러스터가 v1.36.2+k3s1 이라 timeZone 을 쓸 수 있다 — 이제 현지 시각 그대로 적는다.
 #
 # 07:30 KST 인 이유: KRX 가 전일 종가를 확실히 내놓은 뒤이고, 백엔드의 전일 종가 배치
 # (FINCH #69, 08:30 KST)보다 앞선다. ingest 는 date.today() 부터 5일을 되짚어 데이터가
 # 있는 최근 거래일을 찾으므로 주말·공휴일에도 빈손으로 끝나지 않는다.
 cronJobs:
   price-snapshots:
-    schedule: "30 22 * * *"   # 22:30 UTC = 07:30 KST
+    schedule: "30 7 * * *"    # 07:30 Asia/Seoul
+    timeZone: "Asia/Seoul"
     command: ["python", "-m", "ingest.price_snapshots"]
