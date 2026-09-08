@@ -111,3 +111,17 @@ persistence:
 serviceAccount:
   create: true
   name: ""
+
+# 스냅샷 적재 배치. FINCH #70 (a315fcc) 이 `python -m ingest.price_snapshots` 를 넣었고
+# 이미지 sha-a315fccc5a08 부터 들어 있다.
+#
+# ⚠️ schedule 은 UTC 다. 컨트롤러가 이 표현식을 UTC 로 읽고, 파드의 TZ(Asia/Seoul)와
+# 무관하다. timeZone 필드는 k8s 1.27+ 전용이라 쓰지 않는다.
+#
+# 07:30 KST 인 이유: KRX 가 전일 종가를 확실히 내놓은 뒤이고, 백엔드의 전일 종가 배치
+# (FINCH #69, 08:30 KST)보다 앞선다. ingest 는 date.today() 부터 5일을 되짚어 데이터가
+# 있는 최근 거래일을 찾으므로 주말·공휴일에도 빈손으로 끝나지 않는다.
+cronJobs:
+  price-snapshots:
+    schedule: "30 22 * * *"   # 22:30 UTC = 07:30 KST
+    command: ["python", "-m", "ingest.price_snapshots"]
