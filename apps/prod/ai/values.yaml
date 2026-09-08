@@ -19,7 +19,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/tpals0409/finch-ai
-  tag: sha-2c37e7382a2a
+  tag: sha-a315fccc5a08
   digest: ""
   pullPolicy: IfNotPresent
 
