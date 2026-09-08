@@ -94,6 +94,23 @@ bootstrap:
   command: []
   backoffLimit: 1
 
+# 정기 배치. 이름을 키로 하나씩 적으면 CronJob 이 하나씩 생긴다.
+# 기본은 비어 있다 — 아무것도 적지 않은 서비스에는 아무것도 안 생긴다.
+#
+# ⚠️ schedule 은 **UTC** 다. 파드 안의 TZ 와 무관하게 컨트롤러가 UTC 로 읽는다.
+#    KST 로 적고 싶어지는 자리이니 값 옆에 KST 환산을 주석으로 남길 것.
+#    timeZone 필드는 k8s 1.27+ 전용이고 그 아래에서는 조용히 무시된다 —
+#    9시간 어긋난 시각에 도는 형태로 나타나므로 버전 확인 전에는 쓰지 않는다.
+#
+#   cronJobs:
+#     price-snapshots:
+#       schedule: "30 22 * * *"        # 22:30 UTC = 07:30 KST
+#       command: ["python", "-m", "ingest.price_snapshots"]
+#
+# 이름은 <릴리스>-<키> 로 만들어지며 52자를 넘으면 렌더가 실패한다
+# (CronJob 이 Job 이름에 타임스탬프를 덧붙이므로 63 이 아니라 52 다).
+cronJobs: {}
+
 # Spring Boot Actuator 기준. 다른 스택이면 경로를 바꾼다.
 #
 # 주의: 서비스가 server.servlet.context-path 를 설정하면 actuator 경로도
