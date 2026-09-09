@@ -5,7 +5,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/tpals0409/finch-backend
   # CI 가 이미지를 올린 뒤 자동으로 갱신한다. 첫 배포 전에는 수동으로 채운다.
-  tag: sha-9a0eb7444ddc
+  tag: sha-10c99d12e4b0
   digest: ""
   pullPolicy: IfNotPresent
 
