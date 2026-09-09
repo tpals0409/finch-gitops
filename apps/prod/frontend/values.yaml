@@ -7,7 +7,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/tpals0409/finch-frontend
-  tag: sha-b1aff6d0bea0
+  tag: sha-f51bced41477
   digest: ""
   pullPolicy: IfNotPresent
 
