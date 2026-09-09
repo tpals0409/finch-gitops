@@ -93,6 +93,15 @@ env:
     value: prod
   - name: BACKEND_BASE_URL
     value: http://backend:80
+  # 원장을 어디서 읽을지. 기본값이 `seed` 라 이걸 안 적으면 AI 가
+  # tests/fixtures/seed_portfolio.json 을 읽는다 — 운영에서 남의 가짜
+  # 포트폴리오로 답하게 된다 (2026-09-09 에 실제로 그 상태였다).
+  #
+  # `backend` 는 백엔드 `/internal/v1/portfolio`·`/trades` 를 부른다.
+  # 그 API 는 FINCH #129 로 들어갔고, 이 값을 올리기 전에 운영에서
+  # 401/401/200 을 갈라 확인했다 (Pico, 2026-09-09).
+  - name: LEDGER_SOURCE
+    value: backend
 
 resources:
   requests:
