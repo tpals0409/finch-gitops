@@ -132,6 +132,24 @@ env:
   # 수집기 스위치. 2026-09-08 정규장 개장 전에 켰다 (Sprint 9 #46 실가동 검증).
   # ⚠️ 위 세 값 없이 true 로 두면 @Value 주입이 실패해 컨텍스트가 안 뜬다 — 로그가 아니라
   # 파드 crashloop 다. 켜는 변경과 값 주입을 절대 나눠 커밋하지 않는다.
+  # KIS 실시간 시세 웹소켓 (FINCH #159). REST 폴링을 대체하지 않고 위에 얹는다 —
+  # 구독 ack 를 받은 종목만 REST 순회에서 빠지고, 장애·구독 실패·상한 초과는 REST 가 계속 맡는다.
+  #
+  # ⚠️ 이 둘을 나눠 커밋하지 않는다. ENABLED=true 인데 URL 이 비면 빈 생성에서
+  # require(url.isNotBlank()) 가 터져 **파드가 crashloop** 한다 (로그가 아니라 기동 실패다).
+  #
+  # 주소는 T5 실측값이다 (2026-09-10, Pico): 서버 호스트에서 31종 구독 ack 31/31 · 틱 234 ·
+  # 오류 0. backend 파드에서는 210.107.75.39:31000 TCP egress 까지 확인했고,
+  # WS upgrade·인증·프레임 수신은 이 배포가 첫 런타임 검증이다.
+  #
+  # ws:// 평문이다. approval_key 가 평문 구간을 지나므로 연결마다 새로 발급하고 캐시하지 않는다.
+  #
+  # 되돌리기: ENABLED 를 false 로. 그러면 웹소켓 빈이 아예 만들어지지 않고
+  # (@ConditionalOnProperty) 핫셋 전체가 REST 순회로 돌아간다. 시세는 낡아지지만 끊기지 않는다.
+  - name: KIS_WEBSOCKET_ENABLED
+    value: "true"
+  - name: KIS_WEBSOCKET_URL
+    value: "ws://ops.koreainvestment.com:31000"
   - name: KIS_PRICE_ENABLED
     value: "true"
 
