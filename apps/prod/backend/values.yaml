@@ -152,6 +152,23 @@ env:
     value: "ws://ops.koreainvestment.com:31000"
   - name: KIS_PRICE_ENABLED
     value: "true"
+  # 전일 종가 동기화 시각. FINCH #166 이 PreviousCloseSyncJob 의 하드코딩된 08:30 을
+  # finch.stock.previous-close.sync-cron 으로 빼면서 여기로 올라왔다.
+  #
+  # 왜 빼야 했나 (2026-09-11): 이 잡은 AI 의 price_daily 를 읽어 stock.previous_close 를
+  # 채우고, 그 값이 화면의 모든 등락률 기준이 된다. 그런데 그 위의 ai-prices(06:30)·
+  # price-snapshots(07:30) 가 KRX OpenAPI 발행보다 이르게 돌아 9/9 에 멈춰 있었다.
+  # 실측: 06:30·07:30 에는 KRX 가 9/9, 08:32 에는 9/10 (Pico). 08:30 인 이 잡도 늦은
+  # 데이터를 읽을 수 없는 자리였다. 사슬 전체가 발행 시각보다 이른 전제 위에 있었다.
+  #
+  # 오늘 값이 09~10시 10분 간격인 이유: 긴급 배포가 언제 끝날지 찍어 맞히지 않으려는 것이다.
+  # 롤아웃이 언제 끝나든 10분 안에 한 번 돌고, price_daily 는 이미 9/10 이라 몇 번을 돌아도
+  # 같은 값을 쓴다. 6필드 Spring cron 이다 (초 분 시 일 월 요일).
+  #
+  # 내일부터: AI 적재가 07~09시 재시도로 바뀌면 그에 맞춰 이 값만 고친다. 코드 배포가
+  # 필요 없는 것이 외부화의 값어치다.
+  - name: FINCH_STOCK_PREVIOUS_CLOSE_SYNC_CRON
+    value: "0 */10 9-10 * * *"
 
 resources:
   requests:
