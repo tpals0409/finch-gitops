@@ -176,3 +176,22 @@ cronJobs:
     timeZone: "Asia/Seoul"
     command: ["python", "-m", "ingest.prices", "--existing-only"]
     activeDeadlineSeconds: 1800
+
+  # 시가총액 스냅샷. 2026-09-11 에 포트폴리오 기여도(attribution)가 운영에서 409 로
+  # 죽는 걸 Leo 가 발견해 추가한다.
+  #
+  # routes/portfolio.py 의 _market_benchmark 가 instruments.market_cap 과 sector 가
+  # 둘 다 채워진 행으로 시장 벤치마크를 만든다. 없으면 attribution 이 통째로 409 다.
+  # 실측(Pico, 2026-09-11): instruments 2,598행 중 sector 는 2,598, market_cap 은 0.
+  # ingest.instruments 는 DART 를 쓰는데 DART 기업개황이 시가총액을 주지 않는다
+  # (ai/docs/seed-dataset.md). 채우는 경로는 KRX OpenAPI 인 이 잡뿐인데 부르는 쪽이
+  # 없었다 — FINCH #87 때 ingest.prices 가 그랬던 것과 같은 모양이다.
+  #
+  # 08:45 인 이유: 같은 KRX OpenAPI 를 쓰므로 발행 시각(실측 08:32) 뒤여야 하고,
+  # price-snapshots(08:40)와 5분 띄워 전 종목 조회가 동시에 나가지 않게 한다.
+  # 시가총액 비중은 하루 단위로 거의 안 움직이므로(=_market_benchmark 주석) 하루
+  # 한 번이면 충분하고, 09:45·10:45 는 발행 지연 때의 재시도다.
+  marketcap:
+    schedule: "45 8,9,10 * * 1-5"    # 08:45 · 09:45 · 10:45 Asia/Seoul, 평일만
+    timeZone: "Asia/Seoul"
+    command: ["python", "-m", "ingest.krx", "marketcap"]
